@@ -1,0 +1,9 @@
+.mscbackup
+corpora/*
+midis/*
+*.txt
+*.npz
+*.npy
+*.zip
+*.json
+*.mscz

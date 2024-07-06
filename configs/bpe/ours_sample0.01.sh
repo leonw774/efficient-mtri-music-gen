@@ -1,0 +1,8 @@
+#!/bin/bash
+# bpe parameters
+BPE_ITER_NUM=128
+ADJACENCY="ours"
+MIN_SCORE=1
+SAMPLE_RATE=0.01
+BPE_LOG="--log"
+BPE_WORKER_NUMBER=32
