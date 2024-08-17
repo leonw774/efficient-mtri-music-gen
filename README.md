@@ -1,4 +1,4 @@
-# Efficient MTRI Music Generation
+# Efficient Generation of Symbolic Multi-Track Repeatable-Instrument Music
 
 **Table of Contents**
 
@@ -26,7 +26,7 @@ You may need to clear cache first by `pip cache purge` and `conda clean --all`.
 
 ### Step 2 (Optional)
 
-Make you own copy of config files (e.g.: `./config/model/my_model_setting.sh`) if you want to make some changes to the settings.
+Make you own copy of config files (e.g.: `configs/model/my_model_setting.sh`) if you want to make some changes to the settings.
 
 The config files are placed in `configs/corpus`, `configs/bpe` and `configs/model`.
 
