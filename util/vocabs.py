@@ -83,8 +83,8 @@ class Vocabs:
             'track_numbers': vars(self.track_numbers),
             'instruments': vars(self.instruments),
             'max_mps_number': self.max_mps_number,
-            'tempos': vars(self.tempos),
-            'time_signatures': vars(self.time_signatures),
+            # 'tempos': vars(self.tempos),
+            # 'time_signatures': vars(self.time_signatures),
         }
 
 
