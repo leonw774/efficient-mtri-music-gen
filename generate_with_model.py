@@ -385,10 +385,11 @@ def main():
     assert args.sample_number >= 0
 
     # model
-    model = torch.load(
+    ckpt_dict = torch.load(
         args.model_file_path,
         map_location=torch.device(args.use_device)
     )
+    model = MyMidiTransformer.from_ckpt(ckpt_dict)
     assert isinstance(model, MyMidiTransformer)
     if args.max_generation_step is None:
         args.max_generation_step = model.max_seq_length

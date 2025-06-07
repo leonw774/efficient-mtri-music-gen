@@ -903,15 +903,16 @@ def main():
         if args.use_parallel:
             accelerator.wait_for_everyone()
             unwrapped_model = accelerator.unwrap_model(model)
-            accelerator.save(unwrapped_model, ckpt_model_file_path)
+            accelerator.save(unwrapped_model.to_ckpt(), ckpt_model_file_path)
         else:
-            torch.save(model, ckpt_model_file_path)
+            torch.save(model.to_ckpt(), ckpt_model_file_path)
 
         if is_main_process and args.eval.valid_eval_sample_number > 0:
-            ckpt_model = torch.load(
+            ckpt_dict = torch.load(
                 ckpt_model_file_path,
                 map_location=args.use_device
             )
+            ckpt_model = MyMidiTransformer.from_ckpt(ckpt_dict)
             generated_aggr_eval_features = (
                 generate_valid_sample_and_get_eval_features(
                     model=ckpt_model,

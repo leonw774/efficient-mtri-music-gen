@@ -46,6 +46,7 @@ class MyMidiTransformer(nn.Module):
         assert vocabs.events.text2id[tokens.PADDING_TOKEN_STR] == 0
 
         self.vocabs: Vocabs = vocabs
+        self.use_linear_attn = use_linear_attn
         self.max_seq_length = max_seq_length
         self.permute_mps = permute_mps
         self.permute_track_number = permute_track_number
@@ -114,8 +115,6 @@ class MyMidiTransformer(nn.Module):
             for vsize in self.logit_vocabs_size
         ])
 
-        self.use_linear_attn = use_linear_attn
-
         ######## Attention layer
 
         # False is masked, True is keep
@@ -172,6 +171,28 @@ class MyMidiTransformer(nn.Module):
             #     num_layers=layers_number
             # )
 
+    def to_ckpt(self) -> dict:
+        return {
+            'state_dict': self.state_dict(),
+            'config': {
+                'vocabs': self.vocabs.to_dict(),
+                'use_linear_attn': self.use_linear_attn,
+                'max_seq_length': self.max_seq_length,
+                'permute_mps': self.permute_mps,
+                'permute_track_number': self.permute_track_number,
+                'layers_number': self.layers_number,
+                'attn_heads_number': self.attn_heads_number,
+                'embedding_dim': self.embedding_dim,
+                'not_use_mps_number': self.not_use_mps_number
+            }
+        }
+
+    @classmethod
+    def from_ckpt(cls, ckpt: dict):
+        vocabs_dict = ckpt['config'].pop('vocabs')
+        model = cls(vocabs=Vocabs.from_dict(vocabs_dict), **ckpt['config'])
+        model.load_state_dict(ckpt['state_dict'])
+        return model
 
     def to_input_attrs(self, input_seqs: Tensor) -> Tensor:
         """expect batch_input_seqs has shape:
