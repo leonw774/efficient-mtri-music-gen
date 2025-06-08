@@ -72,9 +72,9 @@ dependencies:
     - importlib-resources==5.10.2
     - kiwisolver==1.4.4
     - matplotlib==3.7.0
-    - miditoolkit==0.1.16
+    - miditoolkit==0.1.17
     - mido==1.2.10
-    - numpy==1.21.6
+    - numpy==1.23.5
     - packaging==23.0
     - pandas==1.5.3
     - pillow==9.4.0
