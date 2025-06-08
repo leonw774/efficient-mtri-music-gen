@@ -387,9 +387,11 @@ def main():
     # model
     ckpt_dict = torch.load(
         args.model_file_path,
-        map_location=torch.device(args.use_device)
+        map_location=torch.device(args.use_device),
+        weights_only=False
     )
     model = MyMidiTransformer.from_ckpt(ckpt_dict)
+    model.to(args.use_device)
     assert isinstance(model, MyMidiTransformer)
     if args.max_generation_step is None:
         args.max_generation_step = model.max_seq_length

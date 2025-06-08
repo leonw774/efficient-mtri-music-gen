@@ -910,9 +910,11 @@ def main():
         if is_main_process and args.eval.valid_eval_sample_number > 0:
             ckpt_dict = torch.load(
                 ckpt_model_file_path,
-                map_location=args.use_device
+                map_location=args.use_device,
+                weights_only=False
             )
             ckpt_model = MyMidiTransformer.from_ckpt(ckpt_dict)
+            ckpt_model.to(args.use_device)
             generated_aggr_eval_features = (
                 generate_valid_sample_and_get_eval_features(
                     model=ckpt_model,
