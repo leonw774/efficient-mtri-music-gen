@@ -385,10 +385,13 @@ def main():
     assert args.sample_number >= 0
 
     # model
+    load_kwargs = (
+        {'weights_only': False} if torch.__version__.startswith('2') else {}
+    )
     ckpt_dict = torch.load(
         args.model_file_path,
         map_location=torch.device(args.use_device),
-        weights_only=False
+        **load_kwargs
     )
     model = MyMidiTransformer.from_ckpt(ckpt_dict)
     model.to(args.use_device)

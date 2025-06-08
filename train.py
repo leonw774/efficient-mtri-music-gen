@@ -908,10 +908,15 @@ def main():
             torch.save(model.to_ckpt(), ckpt_model_file_path)
 
         if is_main_process and args.eval.valid_eval_sample_number > 0:
+            load_kwargs = (
+                {'weights_only': False}
+                if torch.__version__.startswith('2')
+                else {}
+            )
             ckpt_dict = torch.load(
                 ckpt_model_file_path,
                 map_location=args.use_device,
-                weights_only=False
+                **load_kwargs
             )
             ckpt_model = MyMidiTransformer.from_ckpt(ckpt_dict)
             ckpt_model.to(args.use_device)
