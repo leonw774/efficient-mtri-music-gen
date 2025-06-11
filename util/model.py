@@ -163,7 +163,8 @@ class MyMidiTransformer(nn.Module):
                 heads=attn_heads_number,
                 attn_dim_head=(embedding_dim // attn_heads_number),
                 attn_dropout=dropout_rate,
-                ff_dropout=dropout_rate
+                ff_dropout=dropout_rate,
+                disable_abs_pos_emb=True
             )
             # layer = nn.TransformerEncoderLayer(
             #     d_model=embedding_dim,
