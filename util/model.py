@@ -43,7 +43,13 @@ class MyMidiTransformer(nn.Module):
             ) -> None:
         super().__init__()
 
-        assert vocabs.events.text2id[tokens.PADDING_TOKEN_STR] == 0
+        # event should use EOS as padding
+        assert vocabs.events.text2id[tokens.END_TOKEN_STR] == 0
+        # others use PAD as padding
+        assert vocabs.pitchs.text2id[tokens.PAD_TOKEN_STR] == 0
+        assert vocabs.durations.text2id[tokens.PAD_TOKEN_STR] == 0
+        assert vocabs.velocities.text2id[tokens.PAD_TOKEN_STR] == 0
+        assert vocabs.instruments.text2id[tokens.PAD_TOKEN_STR] == 0
 
         self.vocabs: Vocabs = vocabs
         self.use_linear_attn = use_linear_attn

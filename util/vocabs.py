@@ -174,9 +174,9 @@ def build_vocabs(
         if t in corpus_measure_time_sigs
     ]
 
-    # padding token HAVE TO be at first
+    # token at index 0 will be padding token: use EOS as padding
     event_vocab = (
-        tokens.SPECIAL_TOKENS_STR
+        [tokens.END_TOKEN_STR, tokens.BEGIN_TOKEN_STR, tokens.SEP_TOKEN_STR]
         + event_multi_note_contours
         + event_track_instrument
         + event_position

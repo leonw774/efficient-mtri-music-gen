@@ -103,7 +103,7 @@ def text_list_to_array(
             continue
         i = h + last_array_len
 
-        if text in tokens.SPECIAL_TOKENS_STR:
+        if text in tokens.SPECIAL_TOKEN_STRS:
             cur_mps_number += 1
             x[i][evt_index] = vocabs.events.text2id[text]
             x[i][mps_index] = cur_mps_number
@@ -179,7 +179,7 @@ def array_to_text_list(array, vocabs: Vocabs) -> List[str]:
         event_text = vocabs.events.id2text[x[ATTR_NAME_INDEX['evt']]]
         typename = event_text[0]
 
-        if event_text in tokens.SPECIAL_TOKENS_STR:
+        if event_text in tokens.SPECIAL_TOKEN_STRS:
             if event_text == tokens.PADDING_TOKEN_STR:
                 continue
             else:
@@ -218,8 +218,6 @@ def array_to_text_list(array, vocabs: Vocabs) -> List[str]:
                 + itob36str(track_number)
             )
             text_list.append(token_text)
-        elif event_text == tokens.PADDING_TOKEN_STR:
-            pass
         else:
             raise ValueError(f'unknown typename of event_text: {event_text}')
     # print(track_number_to_event)
