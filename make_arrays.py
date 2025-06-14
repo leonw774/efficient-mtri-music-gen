@@ -171,14 +171,14 @@ def main():
             )
 
         os.makedirs(npy_dir_path)
-        args_list = [
+        args_gen = (
             {'text_list': p.split(), 'vocabs': vocabs, 'i': i}
             for i, p in enumerate(corpus_reader)
-        ]
+        )
         array_list = []
         with Pool(args.worker_number) as p:
             tqdm_text_list_to_array = tqdm(
-                p.imap(mp_handler, args_list),
+                p.imap(mp_handler, args_gen),
                 total=len(corpus_reader),
                 ncols=80
             )
