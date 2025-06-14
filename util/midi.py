@@ -374,7 +374,11 @@ def get_time_structure_tokens(
     # use the default 120 at first measure
     if tempo_list[0].time > measure_token_list[0].onset:
         tempo_list = [
-            TempoChange(120, measure_token_list[0].onset)
+            TempoChange(
+                # default of 120 need to be quantized as well
+                quantize_tempo(120, tempo_quantization),
+                measure_token_list[0].onset
+            )
         ] + tempo_list
 
     tempo_token_list = [
