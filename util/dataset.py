@@ -57,6 +57,66 @@ def pairwise(iterable: Iterable):
     next(b, None)
     return zip(a, b)
 
+class LazyLoadArray:
+    def __init__(self,
+            npz_zipfile: zipfile.ZipFile,
+            included_piece_id: set[int],
+            use_cache: bool = True):
+        self.npz_zipfile = npz_zipfile
+        zip_name_info_list = zip(npz_zipfile.namelist(), npz_zipfile.infolist())
+        self.array_names_sizes = [
+            {'name': name, 'size': info.file_size}
+            for name, info in zip_name_info_list
+            if int(name[:-4]) in included_piece_id
+        ]
+        # store some of the arrays such that would not OOM
+        self.cache = dict()
+        if len(included_piece_id) == 0:
+            print('dataset size is zero')
+            return
+        if use_cache:
+            other_memory_size = len(included_piece_id) * 3000
+            availiable_memory = (
+                psutil.virtual_memory().available - other_memory_size
+            )
+            tqdm_array_names_sizes = tqdm(
+                enumerate(self.array_names_sizes),
+                desc=(
+                    f'Reading lazy load cache '
+                    f'(availible: {availiable_memory//1000:.3f}KB)'
+                )
+            )
+            end_index = 0
+            for index, name_size in tqdm_array_names_sizes:
+                if availiable_memory - name_size['size'] > 0:
+                    self.cache[name_size['name']] = np.load(
+                        io.BytesIO(self.npz_zipfile.read(name_size['name']))
+                    )
+                    availiable_memory = (
+                        psutil.virtual_memory().available - other_memory_size
+                    )
+                    tqdm_array_names_sizes.set_description_str(
+                        f'Reading lazy load cache '
+                        f'(availible: {availiable_memory//1000}KB)'
+                    )
+                else:
+                    end_index = index
+                    break
+            print(
+                f'Load cache ends at index {end_index} '
+                f'({end_index / len(self.array_names_sizes) * 100}%)'
+            )
+    
+    def __getitem__(self, index):
+        name = self.array_names_sizes[index]['name']
+        return self.cache.get(
+            name,
+            np.load(io.BytesIO(self.npz_zipfile.read(name)))
+        )
+    
+    def __len__(self):
+        return len(self.array_names_sizes)
+
 class MidiDataset(Dataset):
 
     def __init__(
@@ -160,27 +220,36 @@ class MidiDataset(Dataset):
         npz_zipfile = zipfile.ZipFile(npz_path)
         npz_zipinfo_list = npz_zipfile.infolist()
         array_memory_size = sum(zinfo.file_size for zinfo in npz_zipinfo_list)
-        if array_memory_size >= available_memory_size - 1e9:
+        other_memory_size = len(self.included_piece_id) * 3000
+        if array_memory_size >= available_memory_size - other_memory_size:
             if verbose:
                 print(
                     f'Memory not enough. Need {array_memory_size//1000} KB. '
                     f'Only {available_memory_size//1000} KB available.'
                 )
-            raise OSError('Memory not enough.')
-        # load numpy arrays into memory
-        tqdm_array_names = tqdm(
-            npz_zipfile.namelist(),
-            desc='Loading arrays',
-            disable=not verbose,
-            ncols=0
-        )
-        self.pieces = [
-            np.load(io.BytesIO(npz_zipfile.read(array_name)))
-            for array_name in tqdm_array_names
-            # array_name[:-4] to remove the '.npy' in filename
-            if int(array_name[:-4]) in self.included_piece_id
-        ]
-        npz_zipfile.close()
+            # raise OSError('Memory not enough.')
+
+            print('Using lazy loading of array')
+            self.pieces = LazyLoadArray(
+                npz_zipfile, self.included_piece_id, True
+            )
+            self.use_lazy_load = True
+        else:
+            # load numpy arrays into memory
+            tqdm_array_names = tqdm(
+                npz_zipfile.namelist(),
+                desc='Loading arrays',
+                disable=not verbose,
+                ncols=0
+            )
+            self.pieces = [
+                np.load(io.BytesIO(npz_zipfile.read(array_name)))
+                for array_name in tqdm_array_names
+                # array_name[:-4] to remove the '.npy' in filename
+                if int(array_name[:-4]) in self.included_piece_id
+            ]
+            npz_zipfile.close()
+            self.use_lazy_load = False
 
         # The seperators of maximal permutable subarray are:
         self._sep_id = self.vocabs.events.text2id[tokens.SEP_TOKEN_STR]
@@ -220,6 +289,7 @@ class MidiDataset(Dataset):
         max_index = -1 # because the first element we add should be index 0
         tqdm_enum_pieces = tqdm(
             enumerate(self.pieces),
+            total=len(self.pieces),
             desc='Processing',
             disable=not verbose,
             ncols=0

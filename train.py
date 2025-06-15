@@ -657,14 +657,18 @@ def main():
 
     train_dataloader = DataLoader(
         dataset=train_dataset,
-        num_workers=args.dataloader_worker_number,
+        num_workers=(
+            1 if train_dataset.use_lazy_load else args.dataloader_worker_number
+        ),
         batch_size=args.train.batch_size,
         shuffle=True,
         collate_fn=collate_mididataset
     )
     valid_dataloader = DataLoader(
         dataset=valid_dataset,
-        num_workers=args.dataloader_worker_number,
+        num_workers=(
+            1 if train_dataset.use_lazy_load else args.dataloader_worker_number
+        ),
         batch_size=args.train.batch_size,
         shuffle=False,
         collate_fn=collate_mididataset
