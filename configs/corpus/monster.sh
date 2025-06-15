@@ -11,6 +11,6 @@ TEMPO_STEP=16
 MIDI_WORKER_NUMBER=32
 MIDI_DIR_PATH="../Monster-MIDI-Dataset/MIDIs/"
 DATA_NAME="monster"
-TEST_PATHS_FILE='configs/split/empty.txt'
+TEST_PATHS_FILE='configs/split/empty_test.txt'
 VALID_PATHS_FILE='configs/split/monster_valid.txt'
 
