@@ -12,5 +12,5 @@ MIDI_WORKER_NUMBER=32
 MIDI_DIR_PATH="../Monster-MIDI-Dataset/MIDIs/"
 DATA_NAME="monster"
 TEST_PATHS_FILE='configs/split/empty.txt'
-VALID_PATHS_FILE='configs/split/empty.txt'
+VALID_PATHS_FILE='configs/split/monster_valid.txt'
 
