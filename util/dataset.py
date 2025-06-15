@@ -3,7 +3,7 @@ import io
 from itertools import tee
 import os
 import sys
-from typing import List, Callable, Iterable
+from typing import List, Callable, Iterable, Set
 import zipfile
 
 import numpy as np
@@ -60,12 +60,12 @@ def pairwise(iterable: Iterable):
 class LazyLoadArray:
     def __init__(self,
             npz_zipfile: zipfile.ZipFile,
-            included_piece_id: set[int],
+            included_piece_id: Set[int],
             use_cache: bool = True):
         self.npz_zipfile = npz_zipfile
         zip_name_info_list = zip(npz_zipfile.namelist(), npz_zipfile.infolist())
         self.array_names_sizes = [
-            {'name': name, 'size': info.file_size}
+            (name, info.file_size)
             for name, info in zip_name_info_list
             if int(name[:-4]) in included_piece_id
         ]
@@ -88,9 +88,9 @@ class LazyLoadArray:
             )
             end_index = 0
             for index, name_size in tqdm_array_names_sizes:
-                if availiable_memory - name_size['size'] > 0:
-                    self.cache[name_size['name']] = np.load(
-                        io.BytesIO(self.npz_zipfile.read(name_size['name']))
+                if availiable_memory - name_size[1] > 0:
+                    self.cache[name_size[0]] = np.load(
+                        io.BytesIO(self.npz_zipfile.read(name_size[1]))
                     )
                     availiable_memory = (
                         psutil.virtual_memory().available - other_memory_size
@@ -108,7 +108,7 @@ class LazyLoadArray:
             )
     
     def __getitem__(self, index):
-        name = self.array_names_sizes[index]['name']
+        name = self.array_names_sizes[index][1]
         return self.cache.get(
             name,
             np.load(io.BytesIO(self.npz_zipfile.read(name)))

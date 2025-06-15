@@ -770,7 +770,13 @@ def main():
                 0.0
                 for _ in train_output_attr_name
             ])
-            for ga_step in range(gradient_accumulation_steps):
+            tqdm_range_grad_accu_steps = tqdm(
+                range(gradient_accumulation_steps),
+                disable=(gradient_accumulation_steps<=64),
+                ncols=0,
+                leave=None
+            )
+            for ga_step in tqdm_range_grad_accu_steps:
                 # if use parallel and gradient accumulation step isnt the last
                 # then we can use no sync
                 if (args.use_parallel
