@@ -213,7 +213,7 @@ def parse_args():
         default='cuda'
     )
     global_group.add_argument(
-        '--use-parallel',
+        '--use-accelerate',
         action='store_true'
     )
     global_group.add_argument(
@@ -413,16 +413,14 @@ def main():
 
     if not torch.cuda.is_available():
         args.use_device = 'cpu'
-        args.use_parallel = False
+        args.use_accelerate = False
     args.use_device = torch.device(args.use_device)
 
     parallel_devices_count = 1
-    if args.use_parallel:
+    if args.use_accelerate:
         parallel_devices_count = len(
             os.getenv('CUDA_VISIBLE_DEVICES').split(',')
         )
-    if args.use_parallel and parallel_devices_count == 1:
-        args.use_parallel = False
 
     gradient_accumulation_steps = 1
     if args.use_device != 'cpu':
@@ -439,7 +437,7 @@ def main():
                 gradient_accumulation_steps = 1
 
     accelerator: Union[accelerate.Accelerator , None]
-    if args.use_parallel:
+    if args.use_accelerate:
         accelerator = accelerate.Accelerator()
         is_main_process: bool = accelerator.is_main_process
     else:
@@ -530,7 +528,7 @@ def main():
         logging.info('Created loss.csv file at %s', loss_file_path)
 
     if args.use_device.type == 'cuda':
-        if is_main_process and not args.use_parallel:
+        if is_main_process and not args.use_accelerate:
             logging.info(
                 'Torch sees %d CUDA devices. Current device is #%d',
                 torch.cuda.device_count(), torch.cuda.current_device()
@@ -725,7 +723,7 @@ def main():
 
     ######## Move model to devices
 
-    if args.use_parallel:
+    if args.use_accelerate:
         model, optimizer, train_dataloader, valid_dataloader = (
             accelerator.prepare(
                 model, optimizer, train_dataloader, valid_dataloader
@@ -764,7 +762,7 @@ def main():
             for ga_step in range(gradient_accumulation_steps):
                 # if use parallel and gradient accumulation step isnt the last
                 # then we can use no sync
-                if (args.use_parallel
+                if (args.use_accelerate
                     and ga_step + 1 != gradient_accumulation_steps):
                     parallel_no_sync_context = accelerator.no_sync(model)
                 else:
@@ -780,7 +778,7 @@ def main():
                     # seqs has shape (batch_size, seq_size, all_attr_num)
                     input_seqs = to_input_attrs(seqs[:, :-1])
                     target_seqs = to_output_attrs(seqs[:, 1:])
-                    if not args.use_parallel:
+                    if not args.use_accelerate:
                         input_seqs = input_seqs.to(args.use_device)
                         target_seqs = target_seqs.to(args.use_device)
                     batched_logit_list = model(input_seqs)
@@ -801,14 +799,14 @@ def main():
                             )
                         ]
 
-                    if args.use_parallel:
+                    if args.use_accelerate:
                         accelerator.backward(loss)
                     else:
                         loss.backward()
             # end for gradient_accumulation_steps
 
             if args.train.max_grad_norm > 0:
-                if args.use_parallel:
+                if args.use_accelerate:
                     if accelerator.sync_gradients:
                         accelerator.clip_grad_norm_(
                             model.parameters(),
@@ -838,7 +836,7 @@ def main():
             for seqs in validation_tqdm:
                 input_seqs = to_input_attrs(seqs[:, :-1])
                 target_seqs = to_output_attrs(seqs[:, 1:])
-                if not args.use_parallel:
+                if not args.use_accelerate:
                     input_seqs = input_seqs.to(args.use_device)
                     target_seqs = target_seqs.to(args.use_device)
                 batched_logit_list = model(input_seqs)
@@ -846,7 +844,7 @@ def main():
                     batched_logit_list,
                     target_seqs
                 )
-                if args.use_parallel:
+                if args.use_accelerate:
                     # need to gather, since each process see different losses
                     gather_loss: torch.Tensor = accelerator.gather(loss)
                     gather_head_losses: List[torch.Tensor]
@@ -893,7 +891,7 @@ def main():
             f'{cur_num_updates}.pt'
         )
         unwrapped_model = None
-        if args.use_parallel:
+        if args.use_accelerate:
             accelerator.wait_for_everyone()
             unwrapped_model = accelerator.unwrap_model(model)
             accelerator.save(unwrapped_model.to_ckpt(), ckpt_model_file_path)
@@ -951,7 +949,7 @@ def main():
 
     ######## Training end
 
-    # if args.use_parallel:
+    # if args.use_accelerate:
         # Don't need this unless we use trackers in accelerator
         # accelerator.end_training()
 

@@ -244,20 +244,16 @@ if [ "${#train_flags[@]}" -ne 0 ]; then
 fi
 
 launch_command="python3"
-if [ "$USE_PARALLEL" == true ]; then
+if [ "$USE_ACCELERATE" == true ]; then
     NUM_DEVICES=$(echo "$CUDA_VISIBLE_DEVICES" | tr "," " " | wc -w;)
     NUM_TOTAL_DEVICE=$(nvidia-smi --list-gpus | wc -l)
     if [ "$NUM_TOTAL_DEVICE" -lt "$NUM_DEVICES" ]; then
         NUM_DEVICES=$NUM_TOTAL_DEVICE
     fi
-    if [ "$NUM_DEVICES" == "1" ]; then
-        USE_PARALLEL=false
-    else
-        accelerate config default
-        launch_command="accelerate launch --multi_gpu --num_machines 1"
-        launch_command+=" --num_processes $NUM_DEVICES"
-        train_flags+=("--use-parallel")
-    fi
+    accelerate config default
+    launch_command="accelerate launch --multi_gpu --num_machines 1"
+    launch_command+=" --num_processes $NUM_DEVICES"
+    train_flags+=("--use-accelerate")
 fi
 
 $launch_command train.py \
