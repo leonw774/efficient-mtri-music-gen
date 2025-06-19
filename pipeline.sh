@@ -251,7 +251,10 @@ if [ "$USE_ACCELERATE" == true ]; then
         NUM_DEVICES=$NUM_TOTAL_DEVICE
     fi
     accelerate config default
-    launch_command="accelerate launch --multi_gpu --num_machines 1"
+    launch_command="accelerate launch --num_machines 1"
+    if [ "$NUM_DEVICES" != "1" ]; then
+        launch_command+=" --multi_gpu"
+    fi
     launch_command+=" --num_processes $NUM_DEVICES"
     train_flags+=("--use-accelerate")
 fi
@@ -274,7 +277,8 @@ $launch_command train.py \
     --lr-decay-end-updates "$LEARNING_RATE_DECAY_END_UPDATES" \
     --lr-decay-end-ratio "$LEARNING_RATE_DECAY_END_RATIO" \
     \
-    --max-pieces-per-gpu "$MAX_PIECE_PER_GPU" --use-device "$USE_DEVICE" \
+    --use-device "$USE_DEVICE" --max-cuda-devices "$NUM_DEVICES" \
+    --max-pieces-per-gpu "$MAX_PIECE_PER_GPU" \
     --seed "$SEED" --log "$log_path" "${train_flags[@]}" \
     -- "$MIDI_DIR_PATH" "$corpus_dir_path" "$model_dir_path" \
     || {

@@ -182,6 +182,12 @@ def parse_args():
         action='store_true'
     )
     global_group.add_argument(
+        '--max-cuda-devices',
+        type=int,
+        default=1,
+        help='Maximum number of cuda device to use. Default is 1.'
+    )
+    global_group.add_argument(
         '--max-pieces-per-gpu',
         type=or_none(int),
         nargs='?',
@@ -242,7 +248,6 @@ def parse_args():
     global_args_dict['data'] = data_args
     global_args_dict['model'] = model_args
     global_args_dict['train'] = train_args
-    global_args_dict['eval'] = eval_args
 
     # then turn into Namespace
     return Namespace(**global_args_dict)
@@ -376,12 +381,6 @@ def main():
         args.use_accelerate = False
     args.use_device = torch.device(args.use_device)
 
-    parallel_devices_count = 1
-    if args.use_accelerate:
-        parallel_devices_count = len(
-            os.getenv('CUDA_VISIBLE_DEVICES').split(',')
-        )
-
     gradient_accumulation_steps = 1
     if args.use_device != 'cpu':
         if args.max_pieces_per_gpu is not None: # if gpu memory is limited
@@ -389,7 +388,7 @@ def main():
             #     gradient_accumulation_steps * batch_size * device_count
             gradient_accumulation_steps = int(
                 args.train.batch_size
-                / (args.max_pieces_per_gpu * parallel_devices_count)
+                / (args.max_pieces_per_gpu * args.max_cuda_devices)
             )
             if gradient_accumulation_steps > 1:
                 args.train.batch_size = args.max_pieces_per_gpu
@@ -738,14 +737,17 @@ def main():
                 if args.use_accelerate:
                     # need to gather, since each process see different losses
                     gather_loss: torch.Tensor = accelerator.gather(loss)
-                    gather_head_losses: List[torch.Tensor]
-                    gather_head_losses = accelerator.gather(head_losses)
+                    gather_loss = gather_loss.mean()
+                    # gather_head_losses:
                     # dim 0 is process dimension
                     # dim 1 ~ last are original dimensions
-                    gather_loss = gather_loss.mean()
-                    gather_head_losses = torch.stack(
-                        gather_head_losses
-                    ).mean(dim=1)
+                    # but there is only one 
+                    gather_head_losses: List[torch.Tensor]
+                    gather_head_losses = accelerator.gather(head_losses)
+                    if args.max_cuda_devices != 1:
+                        gather_head_losses = (
+                            torch.stack(gather_head_losses).mean(dim=(1))
+                        )
                     valid_loss_list.append(gather_loss.item())
                     valid_head_losses_list.append([
                         hl.item()
