@@ -274,12 +274,6 @@ $launch_command train.py \
     --lr-decay-end-updates "$LEARNING_RATE_DECAY_END_UPDATES" \
     --lr-decay-end-ratio "$LEARNING_RATE_DECAY_END_RATIO" \
     \
-    --sample-function "$SAMPLE_FUNCTION" \
-    --sample-threshold "$SAMPLE_THRESHOLD" \
-    --softmax-temperature "$SOFTMAX_TEMPERATURE" \
-    --valid-eval-sample-number "$VALID_EVAL_SAMPLE_NUMBER" \
-    --valid-eval-worker-number "$EVAL_WORKER_NUMBER" \
-    \
     --max-pieces-per-gpu "$MAX_PIECE_PER_GPU" --use-device "$USE_DEVICE" \
     --seed "$SEED" --log "$log_path" "${train_flags[@]}" \
     -- "$MIDI_DIR_PATH" "$corpus_dir_path" "$model_dir_path" \

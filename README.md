@@ -103,7 +103,6 @@ ONLY_EVAL_UNCOND=true ./pipeline.sh lmd_full ours_sample1.0 linear_mid --use-exi
       - `LEARNING_RATE_DECAY_END_RATIO`
     - `EARLY_STOP`: number of non-improved validation before early
   - Others
-    - `VALID_EVAL_SAMPLE_NUMBER`: number of samples the validated model generates to be evaluated
     - `USE_DEVICE`
     - `EVAL_CONFIG_NAME`: point to a file in `configs/eval`
 

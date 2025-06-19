@@ -153,53 +153,6 @@ def parse_args():
     )
     train_keys = set(action.dest for action in train_group._group_actions)
 
-    eval_group = parser.add_argument_group('evaluation')
-    eval_group.add_argument(
-        '--softmax-temperature',
-        type=float,
-        nargs='+',
-        default=[1.0],
-        help='Set the temperature of softmax before multinomial sampling. \
-            Default is %(default)s.'
-    )
-    eval_group.add_argument(
-        '--sample-function',
-        type=str,
-        nargs='?',
-        choices=('none', 'top-k', 'top-p', 'nucleus'),
-        const='none',
-        default='none',
-        help='The sample function to used. \
-            Choice "top-p" is the same as "nucleus". Default is %(default)s'
-    )
-    eval_group.add_argument(
-        '--sample-threshold',
-        type=float,
-        nargs='+',
-        default=[1.0],
-        help='The probability threshold of nucleus sampling. \
-            Default is %(default)s.'
-    )
-    eval_group.add_argument(
-        '--valid-eval-sample-number',
-        type=int,
-        nargs='?',
-        const=0,
-        default=0,
-        help='If set to 0, no eval on valid set will be performed. \
-            Default is %(default)s'
-    )
-    eval_group.add_argument(
-        '--valid-eval-worker-number',
-        type=int,
-        nargs='?',
-        const=4,
-        default=4,
-        help='If set to 0, no eval on valid set will be performed. \
-            Default is %(default)s'
-    )
-    eval_keys = set(action.dest for action in eval_group._group_actions)
-
     global_group = parser.add_argument_group('others')
     global_group.add_argument(
         '--dataloader-worker-number',
@@ -473,10 +426,6 @@ def main():
             f'{k}:{v}'
             for k, v in vars(args.model).items()
         ])
-        eval_args_str  = '\n'.join([
-            f'{k}:{v}'
-            for k, v in vars(args.eval).items()
-        ])
         train_args_str = '\n'.join([
             f'{k}:{v}'
             for k, v in vars(args.train).items()
@@ -576,71 +525,6 @@ def main():
     if is_main_process:
         logging.info('Size of training set: %d', len(train_dataset))
         logging.info('Size of validation set: %d', len(valid_dataset))
-
-    # if we want to generate and eval samples at each validation
-    valid_eval_features = dict()
-    if is_main_process and args.eval.valid_eval_sample_number > 0:
-        valid_eval_features_path = os.path.join(
-            args.midi_dir_path,
-            'valid_eval_features.json'
-        )
-        if os.path.isfile(valid_eval_features_path):
-            logging.info(
-                'Getting valid set eval features from %s',
-                valid_eval_features_path
-            )
-            with open(valid_eval_features_path, 'r', encoding='utf8') as f:
-                valid_eval_features = json.load(f)
-        else:
-            logging.info('Computing valid set eval features')
-            # copy validation midi files into model_dir
-            pathlist_file_path = to_pathlist_file_path(args.corpus_dir_path)
-            with open(
-                    pathlist_file_path, 'r', encoding='utf8'
-                ) as pathlist_file:
-                all_paths_list = [
-                    p.strip()
-                    for p in pathlist_file.readlines()
-                ]
-            # relative to dataset root
-            valid_file_path_tuple = tuple(valid_path_list)
-            # relative to project root
-            # this also filter out the un-processsable ones
-            valid_file_path_list = [
-                p
-                for p in all_paths_list
-                if p.endswith(valid_file_path_tuple)
-            ]
-            del valid_file_path_tuple
-            for valid_path in valid_file_path_list:
-                # use ckpt as temporary dir
-                shutil.copy(valid_path, ckpt_dir_path)
-
-            # get valid features
-            valid_file_path_list = glob.glob(f'{ckpt_dir_path}/*.mid')
-            tqdm_valid_file_path_list = tqdm(
-                valid_file_path_list,
-                desc='Reading valid set midi files',
-                ncols=0
-            )
-            valid_midi_list = [
-                MidiFile(p)
-                for p in tqdm_valid_file_path_list
-            ]
-            _, valid_eval_features = midi_list_to_features(
-                valid_midi_list,
-                use_tqdm=True
-            )
-            del valid_midi_list
-
-            # save json for reuse
-            with open(valid_eval_features_path, 'w+', encoding='utf8') as f:
-                json.dump(valid_eval_features, f)
-
-            # delete the temporary validation midi files
-            for p in valid_file_path_list:
-                os.remove(p)
-            del valid_file_path_list
 
     ######## Make dataloader
 
@@ -755,18 +639,17 @@ def main():
         )
         for _ in training_tqdm:
             train_loss_list.append(0.0)
-            train_head_losses_list.append([
-                0.0
-                for _ in train_output_attr_name
-            ])
+            train_head_losses_list.append([0.0 for _ in train_output_attr_name])
             for ga_step in range(gradient_accumulation_steps):
-                # if use parallel and gradient accumulation step isnt the last
-                # then we can use no sync
-                if (args.use_accelerate
-                    and ga_step + 1 != gradient_accumulation_steps):
-                    parallel_no_sync_context = accelerator.no_sync(model)
-                else:
-                    parallel_no_sync_context = nullcontext()
+                # If using accelerate and this is not the last gradient
+                # accumulation step, use no_sync to avoid unnecessary
+                # synchronization as it is only needed on the final step
+                parallel_no_sync_context = (
+                    accelerator.no_sync(model)
+                    if (args.use_accelerate
+                        and ga_step < gradient_accumulation_steps - 1) else
+                    nullcontext()
+                )
 
                 with parallel_no_sync_context:
                     try:
@@ -897,31 +780,6 @@ def main():
             accelerator.save(unwrapped_model.to_ckpt(), ckpt_model_file_path)
         else:
             torch.save(model.to_ckpt(), ckpt_model_file_path)
-
-        if is_main_process and args.eval.valid_eval_sample_number > 0:
-            load_kwargs = (
-                {'weights_only': False}
-                if torch.__version__.startswith('2')
-                else {}
-            )
-            ckpt_dict = torch.load(
-                ckpt_model_file_path,
-                map_location=args.use_device,
-                **load_kwargs
-            )
-            ckpt_model = MyMidiTransformer.from_ckpt(ckpt_dict)
-            ckpt_model.to(args.use_device)
-            generated_aggr_eval_features = (
-                generate_valid_sample_and_get_eval_features(
-                    model=ckpt_model,
-                    sample_number=args.eval.valid_eval_sample_number,
-                    valid_eval_features=valid_eval_features,
-                    softmax_temperature=args.eval.softmax_temperature,
-                    sample_function=args.eval.sample_function,
-                    sample_threshold=args.eval.sample_threshold
-                )
-            )
-            log_generated_aggr_eval_features(generated_aggr_eval_features)
 
         if len(valid_loss_list) != 0:
             avg_valid_loss = sum(valid_loss_list) / len(valid_loss_list)
