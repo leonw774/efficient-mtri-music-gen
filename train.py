@@ -33,10 +33,7 @@ from util.evaluations import (
     EVAL_SCALAR_FEATURE_NAMES
 )
 from util.generation import generate
-from util.model import (
-    MyMidiTransformer, compute_losses,
-    LOSS_PADDING_ARG_CHOICES, LOSS_PADDING_ARG_CHOICES_DEFAULT
-)
+from util.model import MyMidiTransformer, compute_losses
 from util.argparse_helper import or_none
 
 
@@ -132,12 +129,6 @@ def parse_args():
         help='The max_norm of nn.util.clip_grad_norm_(). \
             If this value is zero, gradient clipping will not be used. \
             Default is %(default)s.'
-    )
-    train_group.add_argument(
-        '--loss-padding',
-        type=str,
-        choices=LOSS_PADDING_ARG_CHOICES,
-        default=LOSS_PADDING_ARG_CHOICES_DEFAULT
     )
     train_group.add_argument(
         '--lr-peak',
@@ -795,8 +786,7 @@ def main():
                     batched_logit_list = model(input_seqs)
                     loss, head_losses = compute_losses(
                         batched_logit_list,
-                        target_seqs,
-                        args.train.loss_padding
+                        target_seqs
                     )
                     loss = loss / gradient_accumulation_steps
 
@@ -854,8 +844,7 @@ def main():
                 batched_logit_list = model(input_seqs)
                 loss, head_losses = compute_losses(
                     batched_logit_list,
-                    target_seqs,
-                    args.train.loss_padding
+                    target_seqs
                 )
                 if args.use_parallel:
                     # need to gather, since each process see different losses

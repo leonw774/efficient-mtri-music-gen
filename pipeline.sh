@@ -271,7 +271,7 @@ $launch_command train.py \
     --embedding-dim "$EMBEDDING_DIM" \
     --batch-size "$BATCH_SIZE" --max-updates "$MAX_UPDATES" \
     --validation-interval "$VALIDATION_INTERVAL" --early-stop "$EARLY_STOP" \
-    --max-grad-norm "$MAX_GRAD_NORM" --loss-padding "$LOSS_PADDING" \
+    --max-grad-norm "$MAX_GRAD_NORM" \
     \
     --lr-peak "$LEARNING_RATE_PEAK" \
     --lr-warmup-updates "$LEARNING_RATE_WARMUP_UPDATES" \

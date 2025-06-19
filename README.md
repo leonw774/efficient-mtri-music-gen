@@ -95,7 +95,6 @@ ONLY_EVAL_UNCOND=true ./pipeline.sh lmd_full ours_sample1.0 linear_mid --use-exi
     - `BATCH_SIZE`
     - `MAX_UPDATES`: number of updates before training stop
     - `VALIDATION_INTERVAL`: number of update before each validation
-    - `LOSS_PADDING`: How should loss function handle padding symbol; can be "ignore", "wildcard", and "normal"
     - `MAX_GRAD_NORM`
     - Learning rate schedule (linear warmup and then decay to end ratio) parameters
       - `LEARNING_RATE_PEAK`
