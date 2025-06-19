@@ -118,6 +118,13 @@ def parse_args():
         required=True
     )
     train_group.add_argument(
+        '--max-epochs',
+        type=int,
+        default=0,
+        help='Maximum number of training epochs. If set to 0, training will \
+            not be limited by epochs.'
+    )
+    train_group.add_argument(
         '--validation-interval',
         type=int,
         required=True
@@ -129,6 +136,11 @@ def parse_args():
         help='The max_norm of nn.util.clip_grad_norm_(). \
             If this value is zero, gradient clipping will not be used. \
             Default is %(default)s.'
+    )
+    train_group.add_argument(
+        '--weight-decay',
+        type=float,
+        default=1e-2
     )
     train_group.add_argument(
         '--lr-peak',
@@ -220,11 +232,6 @@ def parse_args():
         (k, v)
         for k, v in all_args_dict.items()
         if k in train_keys
-    ))
-    eval_args = Namespace(**dict(
-        (k, v)
-        for k, v in all_args_dict.items()
-        if k in eval_keys
     ))
 
     global_args_dict = dict(
@@ -437,7 +444,6 @@ def main():
         ])
         logging.info(data_args_str)
         logging.info(model_args_str)
-        logging.info(eval_args_str)
         logging.info(train_args_str)
         logging.info(
             'gradient_accumulation_steps:%d',
@@ -626,6 +632,7 @@ def main():
     early_stop_counter = 0
 
     start_time = time()
+    train_epoch = 0
     valid_interval = args.train.validation_interval
     for start_update in range(0, args.train.max_updates, valid_interval):
         model.train()
@@ -655,6 +662,7 @@ def main():
                     try:
                         seqs = next(train_dataloader_iter)
                     except StopIteration:
+                        train_epoch += 1
                         train_dataloader_iter = iter(train_dataloader)
                         seqs = next(train_dataloader_iter)
 
@@ -804,6 +812,14 @@ def main():
                     os.path.join(args.model_dir_path, 'best_model.pt')
                 )
                 logging.info('New best model.')
+        
+        if args.train.max_epochs > 0 and train_epoch > args.train.max_epochs:
+            if is_main_process:
+                logging.info(
+                    'Early stopped: Max epochs %d reached.',
+                    args.train.max_epochs
+                )
+            break
 
     ######## Training end
 

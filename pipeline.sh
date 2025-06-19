@@ -264,8 +264,8 @@ $launch_command train.py \
     --virtual-piece-step-ratio "$VIRTUAL_PIECE_STEP_RATIO" \
     \
     --layers-number "$LAYERS_NUMBER" --attn-heads-number "$ATTN_HEADS_NUMBER" \
-    --embedding-dim "$EMBEDDING_DIM" \
-    --batch-size "$BATCH_SIZE" --max-updates "$MAX_UPDATES" \
+    --embedding-dim "$EMBEDDING_DIM" --batch-size "$BATCH_SIZE" \
+    --max-updates "$MAX_UPDATES" --max-epochs "$MAX_EPOCHS" \
     --validation-interval "$VALIDATION_INTERVAL" --early-stop "$EARLY_STOP" \
     --max-grad-norm "$MAX_GRAD_NORM" \
     \
