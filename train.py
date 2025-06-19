@@ -320,55 +320,6 @@ def log_losses(
             loss_file.write(line + '\n')
 
 
-def generate_valid_sample_and_get_eval_features(
-        model: MyMidiTransformer,
-        sample_number: int,
-        valid_eval_features: dict,
-        softmax_temperature: float,
-        sample_function: str,
-        sample_threshold: float) -> dict:
-    generated_text_list_list = [
-        generate(
-            model=model,
-            max_generation_step=model.max_seq_length,
-            primer_seq=None,
-            softmax_temperature=softmax_temperature,
-            sample_function=sample_function,
-            sample_threshold=sample_threshold,
-            show_tqdm=False
-        )
-        for _ in range(sample_number)
-    ]
-    generated_piece_list = [' '.join(t) for t in generated_text_list_list]
-    generated_aggr_eval_features = piece_list_to_features(
-        generated_piece_list,
-        model.vocabs.paras['tpq']
-    )
-    compare_with_ref(generated_aggr_eval_features, valid_eval_features)
-    return generated_aggr_eval_features
-
-def log_generated_aggr_eval_features(generated_aggr_eval_features):
-    logging.info('\t'.join([
-        f'{fname[:15]}'
-        for fname in EVAL_SCALAR_FEATURE_NAMES
-    ]))
-    logging.info('\t'.join([
-        f'{generated_aggr_eval_features[fname]["mean"]:.12f}'
-        for fname in EVAL_SCALAR_FEATURE_NAMES
-    ]))
-    logging.info('\t'.join([
-        f'{fname[:10]}{suffix}'
-        for suffix in ('_KLD', '_OA', '_HI')
-        for fname in EVAL_DISTRIBUTION_FEATURE_NAMES
-    ]))
-
-    logging.info('\t'.join([
-        f'{generated_aggr_eval_features[fname+suffix]:.12f}'
-        for suffix in ('_KLD', '_OA', '_HI')
-        for fname in EVAL_DISTRIBUTION_FEATURE_NAMES
-    ]))
-
-
 def main():
     ######## Check args and print
     args = parse_args()
@@ -397,7 +348,7 @@ def main():
 
     accelerator: Union[accelerate.Accelerator , None]
     if args.use_accelerate:
-        accelerator = accelerate.Accelerator()
+        accelerator = accelerate.Accelerator(mixed_precision='fp16')
         is_main_process: bool = accelerator.is_main_process
     else:
         accelerator = None
@@ -650,14 +601,15 @@ def main():
                 # If using accelerate and this is not the last gradient
                 # accumulation step, use no_sync to avoid unnecessary
                 # synchronization as it is only needed on the final step
-                parallel_no_sync_context = (
-                    accelerator.no_sync(model)
-                    if (args.use_accelerate
-                        and ga_step < gradient_accumulation_steps - 1) else
-                    nullcontext()
-                )
+                if (args.use_accelerate
+                    and ga_step < gradient_accumulation_steps - 1):
+                    no_sync_context = accelerator.no_sync(model)
+                    autocast_context = accelerator.autocast()
+                else:
+                    no_sync_context = nullcontext()
+                    autocast_context = nullcontext()
 
-                with parallel_no_sync_context:
+                with no_sync_context:
                     try:
                         seqs = next(train_dataloader_iter)
                     except StopIteration:
@@ -672,11 +624,12 @@ def main():
                         input_seqs = input_seqs.to(args.use_device)
                         target_seqs = target_seqs.to(args.use_device)
                     batched_logit_list = model(input_seqs)
-                    loss, head_losses = compute_losses(
-                        batched_logit_list,
-                        target_seqs
-                    )
-                    loss = loss / gradient_accumulation_steps
+                    with autocast_context:
+                        loss, head_losses = compute_losses(
+                            batched_logit_list,
+                            target_seqs
+                        )
+                        loss = loss / gradient_accumulation_steps
 
                     if is_main_process:
                         # this only record the loss calculated on main process
