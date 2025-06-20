@@ -135,6 +135,12 @@ class MidiDataset(Dataset):
         Parameters:
         - `data_dir_path`: Expect path to corpus directory
 
+        - `excluded_path_list`: The list of relative or absolute paths
+          of the files to exclude.
+        
+        - `ignore_path_list_use_ids`: An iterable of indices of paths or None.
+          If this is not None, ignore the `exclude_path_list`.
+
         - `virtual_piece_step_ratio`: Should be not less than 0.
            Default is 0.
             - If > 0, split over-length pieces into multiple virtual
@@ -148,15 +154,12 @@ class MidiDataset(Dataset):
               starting index.
             - If == 0, each piece has only one virtual piece, starting
               from the index 0.
-        
+
         - `flatten_virtual_pieces`: Default is False.
             - If True, all virtual pieces has distinct index number.
             - If False, virtual pieces within same real piece shares
               the same index number, It will be randomly one of the
               virtual pieces when accessed by `__getitem__`.
-
-        - `excluded_path_list`: The list of relative or absolute paths
-          of the files to exclude.
 
         - `permute_mps`: Whether or not the dataset should permute all
           the maximal permutable subarrays before returning in
@@ -169,7 +172,7 @@ class MidiDataset(Dataset):
         - `pitch_augmentation_range`: If set to P, will add a random
           value from -P to +P (all inclusive) on all pitch values as
           data augmentation. Default is 0.
-        
+
         - `verbose`: show tqdm or not.
         """
         self.vocabs = get_corpus_vocabs(data_dir_path)
@@ -230,7 +233,7 @@ class MidiDataset(Dataset):
         npz_zipfile = zipfile.ZipFile(npz_path)
         npz_zipinfo_list = npz_zipfile.infolist()
         array_memory_size = sum(zinfo.file_size for zinfo in npz_zipinfo_list)
-        other_memory_size = len(self.included_piece_id) * 3000
+        other_memory_size = len(self.included_piece_id) * 2560
         if array_memory_size >= available_memory_size - other_memory_size:
             if verbose:
                 print(
@@ -345,6 +348,7 @@ class MidiDataset(Dataset):
                 vp_indices = np.unique(vp_indices)
                 # add measure for zeroth step
                 vp_indices = np.concatenate(([first_midx], vp_indices))
+                self._virtual_piece_indices[pidx] = vp_indices
 
             if permute_mps:
                 # consider sequence: M  P  N  N  N  P  N  N  P  N  M  P  N  N

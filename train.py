@@ -188,7 +188,9 @@ def parse_args():
     )
     global_group.add_argument(
         '--max-cuda-devices',
-        type=int,
+        type=or_none(int),
+        nargs='?',
+        const=1,
         default=1,
         help='Maximum number of cuda device to use. Default is 1.'
     )
@@ -529,7 +531,7 @@ def main():
     valid_dataloader = DataLoader(
         dataset=valid_dataset,
         num_workers=(
-            1 if train_dataset.use_lazy_load else args.dataloader_worker_number
+            1 if valid_dataset.use_lazy_load else args.dataloader_worker_number
         ),
         batch_size=args.train.batch_size,
         shuffle=False,
