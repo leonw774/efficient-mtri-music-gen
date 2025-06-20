@@ -90,7 +90,7 @@ class LazyLoadArray:
             for index, name_size in tqdm_array_names_sizes:
                 if availiable_memory - name_size[1] > 0:
                     self.cache[name_size[0]] = np.load(
-                        io.BytesIO(self.npz_zipfile.read(name_size[1]))
+                        io.BytesIO(self.npz_zipfile.read(name_size[0]))
                     )
                     availiable_memory = (
                         psutil.virtual_memory().available - other_memory_size
@@ -108,7 +108,7 @@ class LazyLoadArray:
             )
     
     def __getitem__(self, index):
-        name = self.array_names_sizes[index][1]
+        name = self.array_names_sizes[index][0]
         return self.cache.get(
             name,
             np.load(io.BytesIO(self.npz_zipfile.read(name)))
