@@ -3,7 +3,7 @@ import io
 from itertools import tee
 import os
 import sys
-from typing import List, Callable, Iterable, Set
+from typing import List, Callable, Iterable, Set, Union
 import zipfile
 
 import numpy as np
@@ -123,7 +123,8 @@ class MidiDataset(Dataset):
             self,
             data_dir_path: str,
             max_seq_length: int,
-            excluded_path_list: List[str] = None,
+            excluded_path_list: Union[List[str], None] = None,
+            ignore_path_list_use_ids: Union[List[int], None] = None,
             virtual_piece_step_ratio: float = 0,
             flatten_virtual_pieces: bool = False,
             permute_mps: bool = False,
@@ -192,6 +193,7 @@ class MidiDataset(Dataset):
                 p.strip()
                 for p in pathlist_file.readlines()
             ]
+        self.full_dataset_size = len(all_paths_list)
         if excluded_path_list is not None and len(excluded_path_list) != 0:
             # assert os.path.exists(test_pathlist_file_path)
             excluded_path_tuple = tuple(p.strip() for p in excluded_path_list)
@@ -199,22 +201,30 @@ class MidiDataset(Dataset):
             excluded_path_tuple = tuple()
         if verbose:
             print('Reading', npz_path)
+        
         self.included_path_list = []
-        self.included_piece_id = set()
-        tqdm_enum_all_path_list = tqdm(
-            enumerate(all_paths_list),
-            desc='Exclude paths',
-            disable=not verbose,
-            ncols=0
-        )
-        for piece_id, midi_path in tqdm_enum_all_path_list:
-            # use endswith because pathlist contain relative paths
-            # from project's root
-            # while excluded_path_list may contain relative paths
-            # from dataset's root
-            if not midi_path.endswith(excluded_path_tuple):
-                self.included_path_list.append(midi_path)
-                self.included_piece_id.add(piece_id)
+        self.included_piece_id: Set[int] = set()
+        if ignore_path_list_use_ids is None:
+            tqdm_enum_all_path_list = tqdm(
+                enumerate(all_paths_list),
+                desc='Exclude paths',
+                disable=not verbose,
+                ncols=0
+            )
+            for piece_id, midi_path in tqdm_enum_all_path_list:
+                # use endswith because pathlist contain relative paths
+                # from project's root
+                # while excluded_path_list may contain relative paths
+                # from dataset's root
+                if not midi_path.endswith(excluded_path_tuple):
+                    self.included_path_list.append(midi_path)
+                    self.included_piece_id.add(piece_id)
+        else:
+            self.included_piece_id = set(ignore_path_list_use_ids)
+            self.included_path_list = [
+                all_paths_list[idx]
+                for idx in ignore_path_list_use_ids
+            ]
 
         available_memory_size = psutil.virtual_memory().available
         npz_zipfile = zipfile.ZipFile(npz_path)

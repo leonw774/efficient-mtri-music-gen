@@ -262,6 +262,7 @@ fi
 $launch_command train.py \
     --test-paths-file "$TEST_PATHS_FILE" \
     --valid-paths-file "$VALID_PATHS_FILE" \
+    --ignore-path-list-use-ratio $TRAIN_VALID_RATIO \
     --max-seq-length "$MAX_SEQ_LENGTH" \
     --pitch-augmentation-range "$PITCH_AUGMENTATION_RANGE" \
     --virtual-piece-step-ratio "$VIRTUAL_PIECE_STEP_RATIO" \

@@ -56,6 +56,11 @@ def parse_args():
         help='The path to the file recording the paths of validation files'
     )
     data_group.add_argument(
+        '--ignore-path-list-use-ratio',
+        type=float,
+        default=-1,
+    )
+    data_group.add_argument(
         '--max-seq-length',
         type=int
     )
@@ -440,43 +445,71 @@ def main():
             )
 
     ######## Make dataset
+    ignore_path_list_use_ratio = args.data.ignore_path_list_use_ratio
+    if (ignore_path_list_use_ratio != -1
+            and not (0.0 <= ignore_path_list_use_ratio <= 1.0)):
+        raise ValueError(
+            f'ignore-path-list-use-ratio must be in [0, 1], '
+            f'got {ignore_path_list_use_ratio}'
+        )
+    del args.data.ignore_path_list_use_ratio
 
-    with open(
-            args.data.test_paths_file_path, 'r', encoding='utf8'
-        ) as test_paths_file:
-        test_path_list = [p.strip() for p in test_paths_file.readlines()]
-    with open(
-            args.data.valid_paths_file_path, 'r', encoding='utf8'
-        ) as valid_paths_file:
-        valid_path_list = [p.strip() for p in valid_paths_file.readlines()]
+    if ignore_path_list_use_ratio != -1:
+        pathlist_file_path = to_pathlist_file_path(args.corpus_dir_path)
+        with open(pathlist_file_path, 'rb') as pathlist_file:
+            paths_number = 0
+            raw_read = pathlist_file.raw.read
+            buf = raw_read(256 * 1024 * 1024)
+            while buf:
+                paths_number += buf.count(b'\n')
+                buf = raw_read(256 * 1024 * 1024)
+        all_ids = list(range(paths_number))
+        np.random.shuffle(all_ids)
+        split_at = int(ignore_path_list_use_ratio * paths_number)
+        train_ids = all_ids[:split_at]
+        excluded_path_list=None
+    else:
+        with open(
+                args.data.test_paths_file_path, 'r', encoding='utf8'
+            ) as test_paths_file:
+            test_path_list = [p.strip() for p in test_paths_file.readlines()]
+        with open(
+                args.data.valid_paths_file_path, 'r', encoding='utf8'
+            ) as valid_paths_file:
+            valid_path_list = [p.strip() for p in valid_paths_file.readlines()]
+        excluded_path_list = valid_path_list + test_path_list
+        train_ids=None
+
     del args.data.test_paths_file_path
     del args.data.valid_paths_file_path
 
     if is_main_process:
         logging.info('Making training dataset')
-    excluded_path_list = valid_path_list + test_path_list
     train_dataset = MidiDataset(
         data_dir_path=args.corpus_dir_path,
         excluded_path_list=excluded_path_list,
+        ignore_path_list_use_ids=train_ids,
         **vars(args.data),
         verbose=is_main_process
     )
-    del excluded_path_list
+
+    if ignore_path_list_use_ratio != -1:
+        valid_ids = all_ids[split_at:]
+    else:
+        all_ids = set(range(train_dataset.full_dataset_size))
+        valid_ids = all_ids.difference(train_dataset.included_piece_id)
 
     if is_main_process:
         logging.info('Making valid dataset')
-    excluded_path_list_for_valid = (
-        train_dataset.included_path_list + test_path_list
-    )
-    # to prevent inconsistency, set valid dataset's virtual piece step to zero
+    # for consistency, set valid dataset's virtual piece step to zero
     args.data.virtual_piece_step_ratio = 0
     valid_dataset = MidiDataset(
         data_dir_path=args.corpus_dir_path,
-        excluded_path_list=excluded_path_list_for_valid,
+        excluded_path_list=None,
+        ignore_path_list_use_ids=valid_ids,
         **vars(args.data),
         verbose=is_main_process
     )
-    del excluded_path_list_for_valid
 
     if is_main_process:
         logging.info('Size of training set: %d', len(train_dataset))
