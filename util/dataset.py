@@ -443,17 +443,28 @@ class MidiDataset(Dataset):
         sampled_array = sampled_array.astype(np.int32)
 
         # tidy up mps numbers
+        # mps number can be overflow because it was uint16
+        mps_index = ATTR_NAME_INDEX['mps']
+        body_mps = sampled_array[body_start_index:, mps_index]
+        if body_mps.shape[0] > 1:
+            # detect a 65535 followed by a 0 in body's mps
+            overflow_indices = np.where(
+                (body_mps[:-1] == 65535) & (body_mps[1:] == 0)
+            )[0]
+            if overflow_indices.size > 0:
+                # add 65536 to all mps after the overflow index
+                for idx in overflow_indices:
+                    body_mps[idx+1:] += 65536
+                sampled_array[body_start_index:, mps_index] = body_mps
+        
         # make sure all mps number smaller are than max_mps_number
         # and all of them are non-decreasing
         if body_start_index != self.max_seq_length:
-            mps_index = ATTR_NAME_INDEX['mps']
-            min_body_mps = np.min(
-                sampled_array[body_start_index:, mps_index]
-            )
+            min_body_mps = np.min(body_mps)
             # magic number 4 because the first measure must have mps number 4
             if min_body_mps < 4:
                 raise ValueError('MPS number in body is less than 4.')
-            sampled_array[body_start_index:, mps_index] -= (min_body_mps-4)
+            sampled_array[body_start_index:, mps_index] -= (min_body_mps - 4)
 
         # pitch augmentation
         # pitch vocabulary is 0:PAD, 1:0, 2:1, ... 128:127
