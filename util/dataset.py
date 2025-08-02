@@ -63,6 +63,7 @@ class LazyLoadArray:
             name_size_list: List[Tuple[str, int]],
             use_cache: bool = True):
         self.load_func = load_func
+        self.name_size_list = name_size_list
         # store some of the arrays such that would not OOM
         self.cache = dict()
         if use_cache:
@@ -70,21 +71,21 @@ class LazyLoadArray:
             availiable_memory = (
                 psutil.virtual_memory().available - other_memory_size
             )
-            tqdm_array_names_sizes = tqdm(
-                enumerate(self.array_names_sizes),
+            tqdm_name_size_list = tqdm(
+                enumerate(name_size_list),
                 desc=(
                     f'Reading lazy load cache '
                     f'(availible: {availiable_memory//1000:.3f}KB)'
                 )
             )
             end_index = 0
-            for index, name_size in tqdm_array_names_sizes:
+            for index, name_size in tqdm_name_size_list:
                 if availiable_memory - name_size[1] > 0:
                     self.cache[name_size[0]] = load_func(name_size[0])
                     availiable_memory = (
                         psutil.virtual_memory().available - other_memory_size
                     )
-                    tqdm_array_names_sizes.set_description_str(
+                    tqdm_name_size_list.set_description_str(
                         f'Reading lazy load cache '
                         f'(availible: {availiable_memory//1000}KB)'
                     )
@@ -93,15 +94,15 @@ class LazyLoadArray:
                     break
             print(
                 f'Load cache ends at index {end_index} '
-                f'({end_index / len(self.array_names_sizes) * 100}%)'
+                f'({end_index / len(self.name_size_list) * 100}%)'
             )
     
     def __getitem__(self, index):
-        name = self.array_names_sizes[index][0]
+        name = self.name_size_list[index][0]
         return self.cache.get(name, self.load_func(name))
     
     def __len__(self):
-        return len(self.array_names_sizes)
+        return len(self.name_size_list)
 
 def load_arrays_from_dir(
         path: str,
@@ -281,6 +282,7 @@ class MidiDataset(Dataset):
         if ignore_path_list_use_ids is None:
             tqdm_enum_all_path_list = tqdm(
                 enumerate(all_paths_list),
+                total=len(all_paths_list),
                 desc='Exclude paths',
                 disable=not verbose,
                 ncols=0
