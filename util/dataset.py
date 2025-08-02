@@ -109,8 +109,13 @@ def load_arrays_from_dir(
         included_piece_id: Set[int],
         verbose: bool = True) -> Tuple[Iterable[np.ndarray], bool]:
     all_name_list = os.listdir(path)
-    all_size_list = [os.stat(name.st_size) for name in all_name_list]
-    array_memory_size = sum(size for _name, size, in all_size_list)
+    included_name_size_list = [
+        (name, os.stat(os.path.join(path, name)).st_size)
+        for name in all_name_list
+        # array_name[:-4] to remove the '.npy' in filename
+        if int(name[:-4]) in included_piece_id
+    ]
+    array_memory_size = sum(size for _name, size, in included_name_size_list)
     other_memory_size = len(included_piece_id) * 3000
     available_memory_size = psutil.virtual_memory().available
     if array_memory_size >= available_memory_size - other_memory_size:
@@ -120,29 +125,25 @@ def load_arrays_from_dir(
                 f'Only {available_memory_size//1000} KB available.'
             )
             print('Using lazy loading of array')
-        def file_load_func(array_name):
-            return np.load(path + '/' + array_name)
-        name_size_list = [
-            (name, size)
-            for name, size in zip(all_name_list, all_size_list)
-            # array_name[:-4] to remove the '.npy' in filename
-            if int(name[:-4]) in included_piece_id
-        ]
-        pieces = LazyLoadArray(file_load_func, name_size_list, use_cache=True)
+        def file_load_func(name):
+            return np.load(os.path.join(path, name))
+        pieces = LazyLoadArray(
+            file_load_func,
+            included_name_size_list,
+            use_cache=True
+        )
         return pieces, True
     else:
         # load numpy arrays into memory
-        tqdm_all_name_list = tqdm(
-            all_name_list,
+        tqdm_included_name_size_list = tqdm(
+            included_name_size_list,
             desc='Loading arrays',
             disable=verbose,
             ncols=0
         )
         pieces = [
-            np.load(path + '/' + array_name)
-            for array_name in tqdm_all_name_list
-            # array_name[:-4] to remove the '.npy' in filename
-            if int(array_name[:-4]) in included_piece_id
+            np.load(os.path.join(path, name))
+            for name, _size in tqdm_included_name_size_list
         ]
         return pieces, False
 
@@ -151,10 +152,15 @@ def load_arrays_from_npz(
         included_piece_id: Set[int],
         verbose: bool = True) -> Tuple[Iterable[np.ndarray], bool]:
     npz_zipfile = zipfile.ZipFile(path)
-    all_size_list = [zinfo.file_size for zinfo in npz_zipfile.infolist()]
-    array_memory_size = sum(all_size_list)
-    other_memory_size = len(included_piece_id) * 3000
+    included_name_size_list = [
+        (name, info.file_size)
+        for name, info in zip(npz_zipfile.namelist(), npz_zipfile.infolist())
+        # array_name[:-4] to remove the '.npy' in filename
+        if int(name[:-4]) in included_piece_id
+    ]
     available_memory_size = psutil.virtual_memory().available
+    array_memory_size = sum(size for _, size in included_name_size_list)
+    other_memory_size = len(included_piece_id) * 3000
     if array_memory_size >= available_memory_size - other_memory_size:
         if verbose:
             print(
@@ -165,27 +171,23 @@ def load_arrays_from_npz(
         # raise OSError('Memory not enough.')
         def npz_load_func(array_name):
             return np.load(io.BytesIO(npz_zipfile.read(array_name)))
-        name_size_list = [
-            (name, size)
-            for name, size in zip(npz_zipfile.namelist(), all_size_list)
-            # array_name[:-4] to remove the '.npy' in filename
-            if int(name[:-4]) in included_piece_id
-        ]
-        pieces = LazyLoadArray(npz_load_func, name_size_list, use_cache=True)
+        pieces = LazyLoadArray(
+            npz_load_func,
+            included_name_size_list,
+            use_cache=True
+        )
         return pieces, True
     else:
         # load numpy arrays into memory
-        tqdm_all_name_list = tqdm(
-            npz_zipfile.namelist(),
+        tqdm_included_name_size_list = tqdm(
+            included_name_size_list,
             desc='Loading arrays',
             disable=not verbose,
             ncols=0
         )
         pieces = [
-            np.load(io.BytesIO(npz_zipfile.read(array_name)))
-            for array_name in tqdm_all_name_list
-            # array_name[:-4] to remove the '.npy' in filename
-            if int(array_name[:-4]) in included_piece_id
+            np.load(io.BytesIO(npz_zipfile.read(name)))
+            for name, _size in tqdm_included_name_size_list
         ]
         npz_zipfile.close()
         return pieces, False
