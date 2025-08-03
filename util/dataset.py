@@ -509,15 +509,9 @@ class MidiDataset(Dataset):
                 for idx in overflow_indices:
                     body_mps[idx+1:] += 65536
                 sampled_array[body_start_index:, mps_index] = body_mps
-        
-        # make sure all mps number smaller are than max_mps_number
-        # and all of them are non-decreasing
-        if body_start_index != self.max_seq_length:
-            min_body_mps = np.min(body_mps)
-            # magic number 4 because the first measure must have mps number 4
-            if min_body_mps < 4:
-                raise ValueError('MPS number in body is less than 4.')
-            sampled_array[body_start_index:, mps_index] -= (min_body_mps - 4)
+        # make mps in body starts from 4
+        min_body_mps = np.min(body_mps)
+        sampled_array[body_start_index:, mps_index] -= (min_body_mps - 4)
 
         # pitch augmentation
         # pitch vocabulary is 0:PAD, 1:0, 2:1, ... 128:127
