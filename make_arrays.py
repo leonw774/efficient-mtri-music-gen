@@ -15,6 +15,7 @@ import numpy as np
 from pandas import Series
 from tqdm import tqdm
 
+from util.argparse_helper import or_none
 from util.tokens import (
     INSTRUMENT_NAMES,
     SEP_TOKEN_STR,
@@ -53,6 +54,11 @@ def parse_args():
     parser.add_argument(
         '--use-existed',
         action='store_true'
+    )
+    parser.add_argument(
+        '--compression-level',
+        type=int,
+        default=0
     )
     parser.add_argument(
         '--debug',
@@ -196,7 +202,7 @@ def main():
             npy_zip_path,
             'x',
             compression=ZIP_DEFLATED,
-            compresslevel=1
+            compresslevel=args.compression_level
         )
         with zipfile_cm as npz_file:
             for file_name in tqdm(os.listdir(npy_dir_path), ncols=80):
