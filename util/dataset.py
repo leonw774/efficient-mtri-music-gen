@@ -96,11 +96,11 @@ class LazyLoadArray:
                 f'Load cache ends at index {end_index} '
                 f'({end_index / len(self.name_size_list) * 100}%)'
             )
-    
+
     def __getitem__(self, index):
         name = self.name_size_list[index][0]
         return self.cache.get(name, self.load_func(name))
-    
+
     def __len__(self):
         return len(self.name_size_list)
 
@@ -268,39 +268,56 @@ class MidiDataset(Dataset):
         if verbose:
             print('Reading', pathlist_file_path)
         with open(pathlist_file_path, 'r', encoding='utf8') as pathlist_file:
-            all_paths_list = [
+            path_list = [
                 p.strip()
                 for p in pathlist_file.readlines()
             ]
-        self.full_dataset_size = len(all_paths_list)
+            assert len(path_list) > 0
+            # remove shared prefix in pathlist
+            common_prefix = os.path.commonprefix(path_list)
+            # trim the prefix to the last separator and
+            # remove the common prefix from each path if it is a valid path
+            sep_index = common_prefix.rfind(os.sep)
+            if sep_index != -1:
+                common_prefix = common_prefix[:sep_index + 1]
+                path_list = [
+                    path[len(common_prefix):]
+                    if path.startswith(common_prefix) else
+                    path
+                    for path in path_list
+                ]
+        self.full_dataset_size = len(path_list)
         if excluded_path_list is not None and len(excluded_path_list) != 0:
-            # assert os.path.exists(test_pathlist_file_path)
-            excluded_path_tuple = tuple(p.strip() for p in excluded_path_list)
+            excluded_path_set = set(p.strip() for p in excluded_path_list)
         else:
-            excluded_path_tuple = tuple()
+            excluded_path_set = set()
 
         self.included_path_list = []
         self.included_piece_id: Set[int] = set()
         if ignore_path_list_use_ids is None:
-            tqdm_enum_all_path_list = tqdm(
-                enumerate(all_paths_list),
-                total=len(all_paths_list),
-                desc='Exclude paths',
-                disable=not verbose,
-                ncols=0
-            )
-            for piece_id, midi_path in tqdm_enum_all_path_list:
-                # use endswith because pathlist contain relative paths
-                # from project's root
-                # while excluded_path_list may contain relative paths
-                # from dataset's root
-                if not midi_path.endswith(excluded_path_tuple):
-                    self.included_path_list.append(midi_path)
-                    self.included_piece_id.add(piece_id)
+            if len(excluded_path_set) > 0:
+                tqdm_enum_all_path_list = tqdm(
+                    enumerate(path_list),
+                    total=len(path_list),
+                    desc='Exclude paths',
+                    disable=not verbose,
+                    ncols=0
+                )
+                for piece_id, midi_path in tqdm_enum_all_path_list:
+                    # use endswith because pathlist contain relative paths
+                    # from project's root
+                    # while excluded_path_list may contain relative paths
+                    # from dataset's root
+                    if midi_path not in excluded_path_set:
+                        self.included_piece_id.add(piece_id)
+                        self.included_path_list.append(midi_path)
+            else:
+                self.included_piece_id = set(range(len(path_list)))
+                self.included_path_list = path_list
         else:
             self.included_piece_id = set(ignore_path_list_use_ids)
             self.included_path_list = [
-                all_paths_list[idx]
+                path_list[idx]
                 for idx in ignore_path_list_use_ids
             ]
 
