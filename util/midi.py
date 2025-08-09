@@ -333,10 +333,11 @@ def get_time_structure_tokens(
     assert last_measure_start <= last_note_end < last_measure_end, \
         "Last note did not ends in last measure"
 
+    default_tempo = quantize_tempo(120, tempo_quantization)
     tempo_token_list = []
     tempo_list = [] # TempoChange(tempo, time)
     if len(midi.tempo_changes) == 0:
-        tempo_list = [TempoChange(120, measure_token_list[0].onset)]
+        tempo_list = [TempoChange(default_tempo, measure_token_list[0].onset)]
     else:
         # remove duplicated time and tempos
         prev_time = None
@@ -374,11 +375,7 @@ def get_time_structure_tokens(
     # use the default 120 at first measure
     if tempo_list[0].time > measure_token_list[0].onset:
         tempo_list = [
-            TempoChange(
-                # default of 120 need to be quantized as well
-                quantize_tempo(120, tempo_quantization),
-                measure_token_list[0].onset
-            )
+            TempoChange(default_tempo, measure_token_list[0].onset)
         ] + tempo_list
 
     tempo_token_list = [
