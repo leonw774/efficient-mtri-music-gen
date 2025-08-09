@@ -210,8 +210,8 @@ class MidiDataset(Dataset):
         Parameters:
         - `data_dir_path`: Expect path to corpus directory
 
-        - `excluded_path_list`: The list of relative or absolute paths
-          of the files to exclude.
+        - `excluded_path_list`: The list of paths of the files to exclude. The
+           paths should be relative from dataset root and have NO common prefix.
         
         - `ignore_path_list_use_ids`: An iterable of indices of paths or None.
           If this is not None, ignore the `exclude_path_list`.
@@ -273,7 +273,8 @@ class MidiDataset(Dataset):
                 for p in pathlist_file.readlines()
             ]
             assert len(path_list) > 0
-            # remove shared prefix in pathlist
+            # remove shared prefix in pathlist because the files are accessed
+            # outside from the datasets root
             common_prefix = os.path.commonprefix(path_list)
             # trim the prefix to the last separator and
             # remove the common prefix from each path if it is a valid path
@@ -296,18 +297,7 @@ class MidiDataset(Dataset):
         self.included_piece_id: Set[int] = set()
         if ignore_path_list_use_ids is None:
             if len(excluded_path_set) > 0:
-                tqdm_enum_all_path_list = tqdm(
-                    enumerate(path_list),
-                    total=len(path_list),
-                    desc='Exclude paths',
-                    disable=not verbose,
-                    ncols=0
-                )
-                for piece_id, midi_path in tqdm_enum_all_path_list:
-                    # use endswith because pathlist contain relative paths
-                    # from project's root
-                    # while excluded_path_list may contain relative paths
-                    # from dataset's root
+                for piece_id, midi_path in enumerate(path_list):
                     if midi_path not in excluded_path_set:
                         self.included_piece_id.add(piece_id)
                         self.included_path_list.append(midi_path)
