@@ -105,10 +105,12 @@ def text_list_to_array(
 
         if text in tokens.SPECIAL_TOKEN_STRS:
             cur_mps_number += 1
+            if cur_mps_number == 65536:
+                cur_mps_number = 0
             x[i][evt_index] = vocabs.events.text2id[text]
             x[i][mps_index] = cur_mps_number
             if text == tokens.BEGIN_TOKEN_STR:
-                cur_mps_number += 1
+                cur_mps_number += 1 # for the track events
 
         elif typename == tokens.TRACK_EVENTS_CHAR:
             event_text, track_number = text.split(':')
@@ -122,17 +124,23 @@ def text_list_to_array(
 
         elif typename == tokens.MEASURE_EVENTS_CHAR:
             cur_mps_number += 1
+            if cur_mps_number == 65536:
+                cur_mps_number = 0
             x[i][evt_index] = vocabs.events.text2id[text]
             x[i][mps_index] = cur_mps_number
 
         elif typename == tokens.TEMPO_EVENTS_CHAR:
             event_text, *attr = text = text.split(':')
             cur_mps_number += 1
+            if cur_mps_number == 65536:
+                cur_mps_number = 0
             x[i][evt_index] = vocabs.events.text2id[event_text]
             x[i][mps_index] = cur_mps_number
 
         elif typename == tokens.POSITION_EVENTS_CHAR:
             cur_mps_number += 1
+            if cur_mps_number == 65536:
+                cur_mps_number = 0
             # cur_position_cursor = i
             x[i][evt_index] = vocabs.events.text2id[text]
             x[i][mps_index] = cur_mps_number
@@ -148,6 +156,8 @@ def text_list_to_array(
             x[i][trn_index] = vocabs.track_numbers.text2id[attr[3]]
             if x[i-1][trn_index] == 0: # if prev is not note/multi-note
                 cur_mps_number += 1
+                if cur_mps_number == 65536:
+                    cur_mps_number = 0
             x[i][mps_index] = cur_mps_number
 
         else:
